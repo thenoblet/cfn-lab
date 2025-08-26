@@ -39,12 +39,6 @@ Resources:
       Roles:
         - !Ref EC2SSMRole
 
-
-  MyKeyPair:
-    Type: AWS::EC2::KeyPair
-    Properties:
-      KeyName: "cfn-lab-keypair"
-
   # ------------------------------------------------------------#
   # Networking Resources
   # ------------------------------------------------------------#
@@ -179,7 +173,6 @@ Resources:
     Properties:
       InstanceType: t3.micro
       ImageId: !Ref LatestAmiId
-      KeyName: !Ref MyKeyPair
       IamInstanceProfile: !Ref EC2InstanceProfile
       SecurityGroupIds:
         - !Ref WebServerSecurityGroup
@@ -201,7 +194,6 @@ Resources:
     Properties:
       InstanceType: t3.micro
       ImageId: !Ref LatestAmiId
-      KeyName: !Ref MyKeyPair
       IamInstanceProfile: !Ref EC2InstanceProfile
       SecurityGroupIds:
         - !Ref WebServerSecurityGroup

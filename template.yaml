@@ -1,0 +1,211 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Creates a VPC with a Public and Private Subnet across two AZs. 
+  Deploys a public web server and a private instance, both accessible via SSM Session Manager.
+
+Parameters:
+  MyKeyPairName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance.
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
+
+  YourFullName:
+    Description: Your full name to display on the web server's index page.
+    Type: String
+    Default: "Patrick Noblet Appiah"
+
+Resources:
+  # ------------------------------------------------------------#
+  # IAM Role for EC2 to allow SSM Access
+  # ------------------------------------------------------------#
+  EC2SSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref EC2SSMRole
+
+  # ------------------------------------------------------------#
+  # Networking Resources
+  # ------------------------------------------------------------#
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-VPC
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-IGW
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-Public-Subnet-1
+
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-Private-Subnet-1
+
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt ElasticIP.AllocationId
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-NAT-Gateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-Public-Route-Table
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-Private-Route-Table
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+
+  # ------------------------------------------------------------#
+  # Security Groups
+  # ------------------------------------------------------------#
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow HTTP and SSH access"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-WebServer-SG
+
+  # ------------------------------------------------------------#
+  # EC2 Instances
+  # ------------------------------------------------------------#
+  PublicWebServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: "ami-0c55b159cbfafe1f0"
+      KeyName: !Ref MyKeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup
+      SubnetId: !Ref PublicSubnet
+      UserData: !Base64
+        Fn::Sub: |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<html><h1>Hello from ${YourFullName}</h1></html>" > /var/www/html/index.html
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-Public-Web-Server
+
+  PrivateInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: "ami-0c55b159cbfafe1f0" # Amazon Linux 2 AMI for us-east-1, change if needed
+      KeyName: !Ref MyKeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup # Re-using SG for simplicity; in prod, this would be more restrictive
+      SubnetId: !Ref PrivateSubnet
+      Tags:
+        - Key: Name
+          Value: CFN-LAB-Private-Instance
+
+Outputs:
+  WebServerURL:
+    Description: "URL of the public web server"
+    Value: !Sub "http://${PublicWebServerInstance.PublicDnsName}"

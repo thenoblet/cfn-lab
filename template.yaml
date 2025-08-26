@@ -195,11 +195,11 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t2.micro
-      ImageId: "ami-0c55b159cbfafe1f0" # Amazon Linux 2 AMI for us-east-1, change if needed
+      ImageId: "ami-0a9e7b2a59a7a6711"
       KeyName: !Ref MyKeyPairName
       IamInstanceProfile: !Ref EC2InstanceProfile
       SecurityGroupIds:
-        - !Ref WebServerSecurityGroup # Re-using SG for simplicity; in prod, this would be more restrictive
+        - !Ref WebServerSecurityGroup
       SubnetId: !Ref PrivateSubnet
       Tags:
         - Key: Name

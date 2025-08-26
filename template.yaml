@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   Creates a VPC with a Public and Private Subnet across two AZs. 
-  Deploys a public web server and a private instance, both accessible via SSM Session Manager.
+  And, deploys a public web server and a private instance, both accessible via SSM Session Manager.
 
 Parameters:
   MyKeyPairName:

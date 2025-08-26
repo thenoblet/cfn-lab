@@ -4,11 +4,6 @@ Description: >
   And, deploys a public web server and a private instance, both accessible via SSM Session Manager.
 
 Parameters:
-  MyKeyPairName:
-    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance.
-    Type: AWS::EC2::KeyPair::KeyName
-    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
-
   YourFullName:
     Description: Your full name to display on the web server's index page.
     Type: String
@@ -43,6 +38,12 @@ Resources:
       Path: "/"
       Roles:
         - !Ref EC2SSMRole
+
+
+  MyKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: "cfn-lab-keypair"
 
   # ------------------------------------------------------------#
   # Networking Resources
@@ -178,7 +179,7 @@ Resources:
     Properties:
       InstanceType: t3.micro
       ImageId: !Ref LatestAmiId
-      KeyName: !Ref MyKeyPairName
+      KeyName: !Ref MyKeyPair
       IamInstanceProfile: !Ref EC2InstanceProfile
       SecurityGroupIds:
         - !Ref WebServerSecurityGroup
@@ -200,7 +201,7 @@ Resources:
     Properties:
       InstanceType: t3.micro
       ImageId: !Ref LatestAmiId
-      KeyName: !Ref MyKeyPairName
+      KeyName: !Ref MyKeyPair
       IamInstanceProfile: !Ref EC2InstanceProfile
       SecurityGroupIds:
         - !Ref WebServerSecurityGroup

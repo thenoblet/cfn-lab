@@ -67,8 +67,6 @@ Resources:
   # ------------------------------------------------------------#
   # SUBNETS
   # ------------------------------------------------------------#
-
-  # Public Subnet in AZ1
   PublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -80,7 +78,6 @@ Resources:
         - Key: Name
           Value: CFN-LAB-Public-Subnet-1
 
-  # Private Subnet in AZ1
   PrivateSubnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -92,7 +89,6 @@ Resources:
         - Key: Name
           Value: CFN-LAB-Private-Subnet-1
 
-  # Public Subnet in AZ2
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -104,7 +100,6 @@ Resources:
         - Key: Name
           Value: CFN-LAB-Public-Subnet-2
 
-  # Private Subnet in AZ2
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -153,6 +148,7 @@ Resources:
       Tags:
         - Key: Name
           Value: CFN-LAB-Public-Route-Table
+          
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: VPCGatewayAttachment
@@ -160,11 +156,13 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
+
   PublicSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
+
   PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -179,12 +177,14 @@ Resources:
       Tags:
         - Key: Name
           Value: CFN-LAB-Private-Route-Table-1
+
   PrivateRoute:
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway
+
   PrivateSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -199,6 +199,7 @@ Resources:
       Tags:
         - Key: Name
           Value: CFN-LAB-Private-Route-Table-2
+
   PrivateRoute2:
     Type: AWS::EC2::Route
     Properties:
@@ -225,10 +226,6 @@ Resources:
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
-        - IpProtocol: icmp
-          FromPort: -1
-          ToPort: -1
-          SourceSecurityGroupId: !Ref PrivateInstanceSecurityGroup
       Tags:
         - Key: Name
           Value: CFN-LAB-WebServer-SG
@@ -238,14 +235,28 @@ Resources:
     Properties:
       GroupDescription: "Security Group for private instance with ICMP access"
       VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: icmp
-          FromPort: -1
-          ToPort: -1
-          SourceSecurityGroupId: !Ref WebServerSecurityGroup
       Tags:
         - Key: Name
           Value: CFN-LAB-Private-Instance-SG
+
+  # Separate Ingress Rules to break the circular dependency
+  WebServerIngressRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref WebServerSecurityGroup
+      IpProtocol: icmp
+      FromPort: -1
+      ToPort: -1
+      SourceSecurityGroupId: !Ref PrivateInstanceSecurityGroup
+
+  PrivateInstanceIngressRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PrivateInstanceSecurityGroup
+      IpProtocol: icmp
+      FromPort: -1
+      ToPort: -1
+      SourceSecurityGroupId: !Ref WebServerSecurityGroup
 
   # ------------------------------------------------------------#
   # EC2 Instances

@@ -199,7 +199,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t3.micro
-      ImageId: "ami-0a9e7b2a59a7a6711"
+      ImageId: !Ref LatestAmiId
       KeyName: !Ref MyKeyPairName
       IamInstanceProfile: !Ref EC2InstanceProfile
       SecurityGroupIds:
